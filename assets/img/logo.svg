@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="mhkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00796b"/>
+      <stop offset="100%" stop-color="#004d40"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  <!-- Background Shield / Circle -->
+  <circle cx="100" cy="100" r="90" fill="url(#mhkGrad)" filter="url(#shadow)"/>
+  <circle cx="100" cy="100" r="82" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="6,4" opacity="0.6"/>
+  <!-- Medical Cross Inner -->
+  <path d="M82,45 L118,45 A6,6 0 0,1 124,51 L124,82 L155,82 A6,6 0 0,1 161,88 L161,112 A6,6 0 0,1 155,118 L124,118 L124,149 A6,6 0 0,1 118,155 L82,155 A6,6 0 0,1 76,149 L76,118 L45,118 A6,6 0 0,1 39,112 L39,88 A6,6 0 0,1 45,82 L76,82 L76,51 A6,6 0 0,1 82,45 Z" fill="#ffffff" filter="url(#shadow)"/>
+  <!-- Heart & Stethoscope or Pulse Ribbon in Center -->
+  <circle cx="100" cy="100" r="22" fill="#004d40"/>
+  <!-- Hospital Building / M symbol -->
+  <path d="M88,107 L88,95 L95,103 L100,97 L105,103 L112,95 L112,107 Z" fill="#ffffff"/>
+  <!-- Stars / Emblems -->
+  <circle cx="100" cy="22" r="4" fill="#ffc107"/>
+  <circle cx="178" cy="100" r="4" fill="#ffc107"/>
+  <circle cx="100" cy="178" r="4" fill="#ffc107"/>
+  <circle cx="22" cy="100" r="4" fill="#ffc107"/>
+</svg>
