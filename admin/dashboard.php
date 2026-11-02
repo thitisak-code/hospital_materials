@@ -260,10 +260,6 @@ $flash = getFlash();
         h1, h2, h3, h4, h5, .nav-link, .btn {
             font-family: 'Prompt', sans-serif;
         }
-        .navbar-mhk {
-            background: linear-gradient(135deg, var(--mhk-primary-dark) 0%, var(--mhk-primary) 100%);
-            box-shadow: 0 4px 15px rgba(0, 77, 64, 0.15);
-        }
         .stat-card {
             border: none;
             border-radius: 16px;
@@ -392,125 +388,17 @@ $flash = getFlash();
             body {
                 padding-bottom: 78px !important;
             }
-            .navbar-mhk .navbar-brand {
-                font-size: 0.92rem;
-            }
         }
     </style>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/app.css?v=20261102">
+<script src="<?= BASE_URL ?>/assets/app.js?v=20261102" defer></script>
 </head>
 <body>
 
 <?php renderLoadingScreen(); ?>
 
 <!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark navbar-mhk sticky-top py-2">
-    <div class="container-fluid px-lg-4">
-        <a class="navbar-brand d-flex align-items-center" href="dashboard.php">
-            <span class="bg-white text-dark rounded-circle p-2 me-2 d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                <i class="fa-solid fa-hospital text-teal fa-lg" style="color: var(--mhk-primary);"></i>
-            </span>
-            <div>
-                <span class="fw-bold d-block lh-1 fs-6 fs-md-5">โรงพยาบาลมหาสารคาม</span>
-                <span class="small opacity-75 fs-7">ระบบคลังใหญ่ & พัสดุกลาง (Super Admin)</span>
-            </div>
-        </a>
-
-        <!-- Mobile Top Right Menu Button -->
-        <button class="btn btn-sm btn-outline-light d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminMobileMenu" aria-label="เมนู">
-            <i class="fa-solid fa-bars"></i>
-        </button>
-
-        <div class="collapse navbar-collapse" id="adminNavbar">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3">
-                <li class="nav-item">
-                    <a class="nav-link active" href="dashboard.php">
-                        <i class="fa-solid fa-warehouse me-1"></i> คลังกลาง
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link fw-semibold text-warning" href="stock_in_out.php">
-                        <i class="fa-solid fa-barcode me-1"></i> รับเข้า-จ่ายออกบาร์โค้ด
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="subunits_stock.php">
-                        <i class="fa-solid fa-hospital-user me-1"></i> สต็อกคลังย่อย
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="refill.php">
-                        <i class="fa-solid fa-dolly me-1"></i> ระบบ Refill
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="reports.php">
-                        <i class="fa-solid fa-chart-pie me-1"></i> รายงานสถิติ
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#requisitions_section">
-                        <i class="fa-solid fa-file-invoice me-1"></i> ใบขอเบิก
-                        <?php if ($stats['pending_reqs'] > 0): ?>
-                            <span class="badge bg-danger rounded-pill ms-1"><?= $stats['pending_reqs'] ?></span>
-                        <?php endif; ?>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="scan_approve.php">
-                        <i class="fa-solid fa-qrcode me-1 text-light"></i> สแกน QR อนุมัติ
-                    </a>
-                </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="fa-solid fa-gear me-1"></i> จัดการระบบ
-                    </a>
-                    <ul class="dropdown-menu border-0 shadow">
-                        <li><a class="dropdown-item" href="users.php"><i class="fa-solid fa-users-gear me-2 text-primary"></i>ผู้ใช้งาน</a></li>
-                        <li><a class="dropdown-item" href="units.php"><i class="fa-solid fa-hospital me-2 text-success"></i>หน่วยงาน/แผนก</a></li>
-                        <li><a class="dropdown-item" href="categories.php"><i class="fa-solid fa-tags me-2 text-warning"></i>หมวดหมู่</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="settings.php"><i class="fa-solid fa-sliders me-2 text-secondary"></i>ตั้งค่าระบบ</a></li>
-                    </ul>
-                </li>
-            </ul>
-
-            <div class="d-flex align-items-center gap-2">
-                <!-- รายงาน PDF -->
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-light dropdown-toggle text-dark fw-medium shadow-sm" type="button" data-bs-toggle="dropdown">
-                        <i class="fa-solid fa-file-pdf text-danger me-1"></i> ออกรายงาน PDF
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                        <li>
-                            <a class="dropdown-item py-2" href="<?= BASE_URL ?>/report_pdf.php?type=inventory" target="_blank">
-                                <i class="fa-solid fa-boxes-stacked me-2 text-primary"></i> รายงานสต็อกคลังกลาง
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item py-2" href="<?= BASE_URL ?>/report_pdf.php?type=borrows" target="_blank">
-                                <i class="fa-solid fa-handshake-angle me-2 text-success"></i> รายงานการยืม-คืนทั้งหมด
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- User profile & Logout -->
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="fa-solid fa-user-shield me-1"></i> <?= h($_SESSION['full_name']) ?>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                        <li class="px-3 py-2 border-bottom">
-                            <span class="d-block small text-muted">บทบาท</span>
-                            <span class="badge bg-warning text-dark"><i class="fa-solid fa-crown me-1"></i> Super Admin</span>
-                        </li>
-                        <li><a class="dropdown-item py-2 text-danger" href="<?= BASE_URL ?>/logout.php"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i> ออกจากระบบ</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-</nav>
+<?php require __DIR__ . '/../includes/navigation.php'; ?>
 
 <!-- Mobile Bottom Navigation Bar (เมนูด้านล่างสำหรับโทรศัพท์มือถือ Super Admin) -->
 <nav class="mobile-bottom-nav d-lg-none">

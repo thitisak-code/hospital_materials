@@ -288,6 +288,69 @@ if ($action === 'use_internal_material') {
 }
 
 // -------------------------------------------------------------
+// 4.1 สแกนบาร์โค้ดจ่ายเวชภัณฑ์ให้ผู้รับบริการ (คนไข้) โดยตรง
+// -------------------------------------------------------------
+if ($action === 'dispense_to_patient') {
+    $material_id   = (int)($_POST['material_id'] ?? 0);
+    $quantity      = (int)($_POST['quantity'] ?? 0);
+    $patient_hn    = trim($_POST['patient_hn'] ?? '');
+    $patient_name  = trim($_POST['patient_name'] ?? 'ผู้รับบริการ');
+    $bed_no        = trim($_POST['bed_no'] ?? '');
+    $procedure     = trim($_POST['procedure'] ?? '');
+    $used_by       = trim($_POST['used_by'] ?? $_SESSION['full_name']);
+
+    if ($material_id <= 0 || $quantity <= 0) {
+        setFlash('danger', 'กรุณาระบุรายการเวชภัณฑ์และจำนวนที่ใช้ให้ถูกต้อง');
+        handleRedirect("scan.php?unit_id=" . $current_unit_id, $redirect_to);
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        $stock_stmt = $pdo->prepare("SELECT quantity FROM unit_stocks WHERE unit_id = ? AND material_id = ? FOR UPDATE");
+        $stock_stmt->execute([$current_unit_id, $material_id]);
+        $stock = (int)$stock_stmt->fetchColumn();
+
+        if ($stock < $quantity) {
+            $pdo->rollBack();
+            setFlash('danger', "เวชภัณฑ์ในห้องพัสดุมีเพียง {$stock} หน่วย ไม่เพียงพอต่อการจ่ายให้คนไข้ ({$quantity} หน่วย)");
+            handleRedirect("scan.php?unit_id=" . $current_unit_id, $redirect_to);
+        }
+
+        // 1. ตัดสต็อกออกจากห้องตนเอง
+        $deduct_stmt = $pdo->prepare("UPDATE unit_stocks SET quantity = quantity - ? WHERE unit_id = ? AND material_id = ?");
+        $deduct_stmt->execute([$quantity, $current_unit_id, $material_id]);
+
+        // 2. บันทึกประวัติการจ่ายให้คนไข้ลงใน unit_usages
+        $purpose_text = "จ่ายให้คนไข้: {$patient_name} (HN: {$patient_hn})";
+        if (!empty($bed_no)) $purpose_text .= " เตียง: {$bed_no}";
+        if (!empty($procedure)) $purpose_text .= " หัตถการ: {$procedure}";
+
+        $mat_info = $pdo->query("SELECT lot_no, unit_price, supplier FROM materials WHERE material_id = {$material_id}")->fetch();
+        $lot_no = $mat_info['lot_no'] ?? null;
+        $unit_price = (float)($mat_info['unit_price'] ?? 0);
+        $supplier = $mat_info['supplier'] ?? '';
+
+        $log_stmt = $pdo->prepare("
+            INSERT INTO unit_usages (unit_id, material_id, patient_hn, patient_name, quantity, lot_no, used_by, patient_or_purpose, used_at, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+        ");
+        $log_stmt->execute([$current_unit_id, $material_id, $patient_hn, $patient_name, $quantity, $lot_no, $used_by, $purpose_text, $user_id]);
+
+        // 3. บันทึกประวัติการเคลื่อนไหวสต็อก
+        logStockMovement($pdo, $material_id, $current_unit_id, 'out', $quantity, 'patient_dispense', $patient_hn, $purpose_text, $user_id, $unit_price, $supplier);
+
+        $pdo->commit();
+        setFlash('success', "สแกนจ่ายเวชภัณฑ์ให้คนไข้ HN: {$patient_hn} ({$patient_name}) จำนวน {$quantity} หน่วย เรียบร้อยแล้ว");
+    } catch (\PDOException $e) {
+        $pdo->rollBack();
+        setFlash('danger', "เกิดข้อผิดพลาดในการบันทึกจ่ายให้คนไข้: " . $e->getMessage());
+    }
+
+    handleRedirect("scan.php?unit_id=" . $current_unit_id, $redirect_to);
+}
+
+// -------------------------------------------------------------
 // 4.2 บันทึกการเบิกใช้พัสดุในห้องตนเองหลายรายการพร้อมกัน (Batch Multi-Item Room Usage)
 // -------------------------------------------------------------
 if ($action === 'batch_internal_usage') {

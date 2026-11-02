@@ -13,18 +13,18 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
-// ตั้งค่า Base URL อัตโนมัติ (รองรับ Subfolder เช่น /hospital_materials)
+// ตั้งค่า Base URL อัตโนมัติ (รองรับทั้ง Root Domain เช่น domain.com, Subdomain และ Subfolder เช่น domain.com/hospital_materials)
 $script_name = $_SERVER['SCRIPT_NAME'] ?? '';
-if (empty($script_name) || $script_name === '-') {
-    $clean_base = '/hospital_materials';
+$base_dir = str_replace('\\', '/', dirname($script_name));
+if ($base_dir === '/' || $base_dir === '\\' || $base_dir === '.') {
+    $clean_base = '';
 } else {
-    $base_dir = str_replace('\\', '/', dirname($script_name));
-    if ($base_dir === '/' || $base_dir === '\\' || $base_dir === '.') {
-        $base_dir = '';
-    }
     $clean_base = preg_replace('/(\/admin|\/unit)$/i', '', $base_dir);
+    if ($clean_base === '/' || $clean_base === '\\') {
+        $clean_base = '';
+    }
 }
-define('BASE_URL', $clean_base ?: '/hospital_materials');
+define('BASE_URL', rtrim($clean_base, '/'));
 
 // 2. ตั้งค่า Timezone ประเทศไทย
 date_default_timezone_set('Asia/Bangkok');
@@ -46,6 +46,11 @@ try {
         PDO::ATTR_EMULATE_PREPARES   => false,
     ];
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+    
+    // Auto-migration: ตรวจสอบและอัปเดตโครงสร้างฐานข้อมูลอัตโนมัติ (ช่วยให้ใช้งานได้ทันทีทั้ง Local และ Web Hosting)
+    if (file_exists(__DIR__ . '/database/auto_migrate.php')) {
+        require_once __DIR__ . '/database/auto_migrate.php';
+    }
 } catch (\PDOException $e) {
     die("Database Connection Error: " . htmlspecialchars($e->getMessage()));
 }
@@ -156,18 +161,32 @@ function thaiDate($datetime, $showTime = true) {
  * บันทึกประวัติการเคลื่อนไหว เข้า-ออก ของพัสดุ (In-Out Stock Movements)
  */
 if (!function_exists('logStockMovement')) {
-    function logStockMovement($pdo, $material_id, $unit_id, $type, $qty, $ref_type, $ref_id, $desc, $user_id) {
+    function logStockMovement($pdo, $material_id, $unit_id, $type, $qty, $ref_type, $ref_id, $desc, $user_id, $unit_price = null, $supplier = null) {
         try {
             $stk = $pdo->prepare("SELECT quantity FROM unit_stocks WHERE unit_id = ? AND material_id = ?");
             $stk->execute([$unit_id, $material_id]);
             $bal = $stk->fetchColumn();
             $balance_after = ($bal !== false) ? (int)$bal : null;
 
+            if ($unit_price === null || $supplier === null) {
+                $mat_stmt = $pdo->prepare("SELECT unit_price, supplier FROM materials WHERE material_id = ?");
+                $mat_stmt->execute([$material_id]);
+                $mat_info = $mat_stmt->fetch();
+                if ($mat_info) {
+                    if ($unit_price === null) $unit_price = (float)($mat_info['unit_price'] ?? 0);
+                    if ($supplier === null) $supplier = $mat_info['supplier'] ?? '';
+                } else {
+                    if ($unit_price === null) $unit_price = 0.00;
+                    if ($supplier === null) $supplier = '';
+                }
+            }
+            $total_price = (float)$unit_price * (int)$qty;
+
             $stmt = $pdo->prepare("
-                INSERT INTO stock_movements (material_id, unit_id, movement_type, quantity, balance_after, reference_type, reference_id, description, performed_by, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO stock_movements (material_id, unit_id, movement_type, quantity, balance_after, reference_type, reference_id, description, performed_by, unit_price, total_price, supplier, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
-            $stmt->execute([$material_id, $unit_id, $type, $qty, $balance_after, $ref_type, $ref_id, $desc, $user_id]);
+            $stmt->execute([$material_id, $unit_id, $type, $qty, $balance_after, $ref_type, $ref_id, $desc, $user_id, $unit_price, $total_price, $supplier]);
         } catch (\Exception $e) {
             // ไม่ให้กระทบการทำงานหลัก
         }

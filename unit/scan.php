@@ -113,10 +113,6 @@ $closed_reason = getSetting('requisition_closed_reason', 'ระบบปิด�
         h1, h2, h3, h4, h5, .nav-link, .btn {
             font-family: 'Prompt', sans-serif;
         }
-        .navbar-scanner {
-            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.2);
-        }
         .scanner-card {
             background: #ffffff;
             border-radius: 20px;
@@ -231,36 +227,17 @@ $closed_reason = getSetting('requisition_closed_reason', 'ระบบปิด�
             body {
                 padding-bottom: 78px !important;
             }
-            .navbar-scanner .navbar-brand {
-                font-size: 0.92rem;
-            }
         }
     </style>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/app.css?v=20261102">
+<script src="<?= BASE_URL ?>/assets/app.js?v=20261102" defer></script>
 </head>
 <body>
 
 <?php renderLoadingScreen(); ?>
 
 <!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark navbar-scanner sticky-top py-2">
-    <div class="container-fluid px-lg-4">
-        <a class="navbar-brand d-flex align-items-center" href="<?= BASE_URL ?>/unit/dashboard.php">
-            <span class="bg-white text-dark rounded-circle p-2 me-2 d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                <i class="fa-solid fa-qrcode text-primary fa-lg"></i>
-            </span>
-            <div>
-                <span class="fw-bold d-block lh-1 fs-6 fs-md-5">โรงพยาบาลมหาสารคาม</span>
-                <span class="small opacity-75 fs-7">ระบบสแกน QR Code พัสดุและเบิกจ่าย</span>
-            </div>
-        </a>
-
-        <div class="d-flex align-items-center gap-2">
-            <a href="<?= BASE_URL ?>/unit/dashboard.php<?= isset($_GET['unit_id']) ? '?unit_id='.$current_unit_id : '' ?>" class="btn btn-sm btn-light text-primary fw-medium rounded-3">
-                <i class="fa-solid fa-arrow-left me-1"></i> กลับห้องพัสดุ
-            </a>
-        </div>
-    </div>
-</nav>
+<?php require __DIR__ . '/../includes/navigation.php'; ?>
 
 <!-- Mobile Bottom Navigation Bar (สำหรับโทรศัพท์มือถือ) -->
 <nav class="mobile-bottom-nav d-lg-none">

@@ -145,10 +145,6 @@ $flash = getFlash();
         h1, h2, h3, h4, h5, .nav-link, .btn {
             font-family: 'Prompt', sans-serif;
         }
-        .navbar-unit {
-            background: linear-gradient(135deg, var(--mhk-primary) 0%, var(--mhk-primary-dark) 100%);
-            box-shadow: 0 4px 15px rgba(15, 118, 110, 0.2);
-        }
         .material-card {
             border-radius: 18px;
             border: 1px solid #e2e8f0;
@@ -314,75 +310,17 @@ $flash = getFlash();
             .floating-cart-btn, .floating-use-btn {
                 display: none !important;
             }
-            .navbar-unit .navbar-brand {
-                font-size: 0.92rem;
-            }
         }
     </style>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/app.css?v=20261102">
+<script src="<?= BASE_URL ?>/assets/app.js?v=20261102" defer></script>
 </head>
 <body>
 
 <?php renderLoadingScreen(); ?>
 
 <!-- Navbar (Top Header) -->
-<nav class="navbar navbar-expand-lg navbar-dark navbar-unit sticky-top py-2">
-    <div class="container-fluid px-lg-4">
-        <a class="navbar-brand d-flex align-items-center" href="dashboard.php<?= isset($_GET['unit_id']) ? '?unit_id='.$current_unit_id : '' ?>">
-            <span class="bg-white text-dark rounded-circle p-2 me-2 d-inline-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
-                <i class="fa-solid fa-hospital-user text-teal" style="color: var(--mhk-primary);"></i>
-            </span>
-            <div>
-                <span class="fw-bold d-block lh-1 fs-6 fs-md-5">โรงพยาบาลมหาสารคาม</span>
-                <span class="small opacity-75 fs-7">ห้องพัสดุ: <?= h($current_unit['unit_name']) ?></span>
-            </div>
-        </a>
-
-        <!-- Mobile Top Right Menu Button -->
-        <button class="btn btn-sm btn-outline-light d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#unitMobileMenu" aria-label="เมนู">
-            <i class="fa-solid fa-bars"></i>
-        </button>
-
-        <!-- Desktop Navigation Links -->
-        <div class="collapse navbar-collapse" id="unitNavbar">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3">
-                <li class="nav-item">
-                    <a class="nav-link active" href="dashboard.php<?= isset($_GET['unit_id']) ? '?unit_id='.$current_unit_id : '' ?>">
-                        <i class="fa-solid fa-cubes me-1"></i> รายการพัสดุในห้อง (Card View)
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#requisitions_tab">
-                        <i class="fa-solid fa-file-invoice me-1"></i> ใบขอเบิกคลังกลาง
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#usages_tab">
-                        <i class="fa-solid fa-clipboard-check me-1"></i> ประวัติการเบิกใช้
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link fw-bold text-warning" href="<?= BASE_URL ?>/unit/scan.php<?= isset($_GET['unit_id']) ? '?unit_id='.$current_unit_id : '' ?>">
-                        <i class="fa-solid fa-barcode me-1"></i> สแกนบาร์โค้ดจ่ายคนไข้
-                    </a>
-                </li>
-            </ul>
-
-            <div class="d-flex align-items-center gap-2">
-                <?php if ($_SESSION['role'] === 'super_admin'): ?>
-                    <a href="<?= BASE_URL ?>/admin/dashboard.php" class="btn btn-sm btn-outline-light">
-                        <i class="fa-solid fa-warehouse me-1"></i> กลับคลังใหญ่
-                    </a>
-                <?php endif; ?>
-                <a href="<?= BASE_URL ?>/report_pdf.php?type=unit&unit_id=<?= $current_unit_id ?>" target="_blank" class="btn btn-sm btn-light text-danger fw-semibold">
-                    <i class="fa-solid fa-file-pdf me-1"></i> พิมพ์รายงานห้อง
-                </a>
-                <a href="<?= BASE_URL ?>/logout.php" class="btn btn-sm btn-outline-light">
-                    <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> ออกจากระบบ
-                </a>
-            </div>
-        </div>
-    </div>
-</nav>
+<?php require __DIR__ . '/../includes/navigation.php'; ?>
 
 <!-- Mobile Bottom Navigation Bar (เมนูด้านล่างสำหรับโทรศัพท์มือถือ) -->
 <nav class="mobile-bottom-nav d-lg-none">
