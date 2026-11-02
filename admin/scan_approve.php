@@ -221,8 +221,17 @@ $flash = getFlash();
         </a>
 
         <div class="d-flex align-items-center gap-2">
+            <a href="stock_in_out.php" class="btn btn-sm btn-outline-light rounded-3">
+                <i class="fa-solid fa-barcode me-1"></i> รับ-จ่ายบาร์โค้ด
+            </a>
+            <a href="subunits_stock.php" class="btn btn-sm btn-outline-light rounded-3">
+                <i class="fa-solid fa-hospital-user me-1"></i> สต็อกคลังย่อย
+            </a>
+            <a href="reports.php" class="btn btn-sm btn-outline-light rounded-3">
+                <i class="fa-solid fa-chart-pie me-1"></i> รายงาน
+            </a>
             <a href="dashboard.php" class="btn btn-sm btn-light text-dark fw-semibold rounded-3">
-                <i class="fa-solid fa-warehouse me-1"></i> กลับแดชบอร์ดคลังกลาง
+                <i class="fa-solid fa-warehouse me-1"></i> แดชบอร์ด
             </a>
         </div>
     </div>

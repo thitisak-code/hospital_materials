@@ -535,6 +535,110 @@ elseif ($type === 'borrows') {
         </tr>
     </table>';
 }
+elseif ($type === 'valuation') {
+    $val_sql = "
+        SELECT 
+            u.unit_id, u.unit_code, u.unit_name,
+            COALESCE(SUM(us.quantity * m.unit_price), 0) AS current_inventory_value,
+            COALESCE(in_sum.total_in_val, 0) AS period_in_value,
+            COALESCE(out_sum.total_out_val, 0) AS period_out_value
+        FROM units u
+        LEFT JOIN unit_stocks us ON u.unit_id = us.unit_id
+        LEFT JOIN materials m ON us.material_id = m.material_id
+        LEFT JOIN (
+            SELECT unit_id, SUM(total_price) AS total_in_val
+            FROM stock_movements
+            WHERE movement_type = 'in'
+            GROUP BY unit_id
+        ) in_sum ON u.unit_id = in_sum.unit_id
+        LEFT JOIN (
+            SELECT unit_id, SUM(total_price) AS total_out_val
+            FROM stock_movements
+            WHERE movement_type = 'out'
+            GROUP BY unit_id
+        ) out_sum ON u.unit_id = out_sum.unit_id
+        GROUP BY u.unit_id
+        ORDER BY u.unit_id ASC
+    ";
+    $valuation_reports = $pdo->query($val_sql)->fetchAll();
+
+    $tot_inv = 0; $tot_in = 0; $tot_out = 0;
+    foreach ($valuation_reports as $vr) {
+        $tot_inv += (float)$vr['current_inventory_value'];
+        $tot_in  += (float)$vr['period_in_value'];
+        $tot_out += (float)$vr['period_out_value'];
+    }
+
+    $html = '
+    <div class="memo-header">บันทึกข้อความ</div>
+    <table class="memo-meta">
+        <tr>
+            <td style="width: 50%;"><strong>ส่วนราชการ:</strong> งานคลังพัสดุและเวชภัณฑ์ โรงพยาบาลมหาสารคาม</td>
+            <td style="width: 50%;"><strong>วันที่:</strong> ' . $todayThai . '</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>เรื่อง:</strong> รายงานสรุปมูลค่าคงคลัง มูลค่ารวมรับ และมูลค่ารวมจ่ายของหน่วยเบิกย่อยและคลังใหญ่</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>เรียน:</strong> ผู้อำนวยการโรงพยาบาลมหาสารคาม</td>
+        </tr>
+    </table>
+
+    <p style="text-indent: 2.5cm; margin-bottom: 8px;">
+        งานคลังพัสดุและเวชภัณฑ์ ขอรายงานสรุปมูลค่าคงคลังปัจจุบัน มูลค่ารวมรับ และมูลค่ารวมจ่ายของคลังใหญ่และหน่วยเบิกย่อยทุกแผนก เพื่อใช้ในการบริหารจัดการพัสดุและควบคุมงบประมาณทางการแพทย์ ดังรายการต่อไปนี้
+    </p>
+
+    <table class="table-data">
+        <thead>
+            <tr>
+                <th style="width: 12%;">รหัสหน่วย</th>
+                <th>หน่วยงาน / แผนกคลัง</th>
+                <th style="width: 20%; text-align: right;">มูลค่าคงคลัง (บาท)</th>
+                <th style="width: 20%; text-align: right;">มูลค่ารวมรับ (บาท)</th>
+                <th style="width: 20%; text-align: right;">มูลค่ารวมจ่าย (บาท)</th>
+            </tr>
+        </thead>
+        <tbody>';
+
+    foreach ($valuation_reports as $vr) {
+        $html .= '
+            <tr>
+                <td class="text-center font-monospace">' . h($vr['unit_code']) . '</td>
+                <td>' . h($vr['unit_name']) . ($vr['unit_id'] == 1 ? ' <strong>(คลังใหญ่)</strong>' : '') . '</td>
+                <td style="text-align: right;">' . number_format($vr['current_inventory_value'], 2) . '</td>
+                <td style="text-align: right;">' . number_format($vr['period_in_value'], 2) . '</td>
+                <td style="text-align: right;">' . number_format($vr['period_out_value'], 2) . '</td>
+            </tr>';
+    }
+
+    $html .= '
+            <tr style="background-color: #f2f2f2; font-weight: bold;">
+                <td colspan="2" class="text-center">มูลค่ารวมทั้งสิ้นทั้งโรงพยาบาล</td>
+                <td style="text-align: right;">' . number_format($tot_inv, 2) . '</td>
+                <td style="text-align: right;">' . number_format($tot_in, 2) . '</td>
+                <td style="text-align: right;">' . number_format($tot_out, 2) . '</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <table class="signature-container">
+        <tr>
+            <td class="signature-box">
+                ลงชื่อ..............................................................<br>
+                ( ' . h($_SESSION['full_name']) . ' )<br>
+                ตำแหน่ง เจ้าหน้าที่งานพัสดุและคลังกลาง<br>
+                วันที่ ' . $todayThai . '
+            </td>
+            <td class="signature-box">
+                [ &nbsp; ] ทราบ<br><br>
+                ลงชื่อ..............................................................<br>
+                ( นายแพทย์เชี่ยวชาญ )<br>
+                ตำแหน่ง ผู้อำนวยการโรงพยาบาลมหาสารคาม<br>
+                วันที่ ......../......../..............
+            </td>
+        </tr>
+    </table>';
+}
 
 $fullHtml = $stylesheet . $html;
 $mpdf->WriteHTML($fullHtml);

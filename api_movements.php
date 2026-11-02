@@ -55,6 +55,9 @@ foreach ($movements as $m) {
         'movement_id'   => $m['movement_id'],
         'movement_type' => $m['movement_type'], // 'in' or 'out'
         'quantity'      => (int)$m['quantity'],
+        'unit_price'    => (float)($m['unit_price'] ?? 0),
+        'total_price'   => (float)($m['total_price'] ?? 0),
+        'supplier'      => $m['supplier'] ?? '',
         'balance_after' => $m['balance_after'] !== null ? (int)$m['balance_after'] : null,
         'reference_type'=> $m['reference_type'],
         'reference_id'  => $m['reference_id'] ?? '-',

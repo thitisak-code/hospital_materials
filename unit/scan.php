@@ -21,9 +21,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_material') {
         exit;
     }
 
-    // ค้นหาข้อมูลวัสดุ
-    $stmt = $pdo->prepare("SELECT * FROM materials WHERE material_code = ? OR material_id = ? LIMIT 1");
-    $stmt->execute([$code, is_numeric($code) ? (int)$code : 0]);
+    // ค้นหาข้อมูลวัสดุ รองรับทั้งรหัสบาร์โค้ด, รหัสพัสดุ, หรือ ID
+    $stmt = $pdo->prepare("SELECT * FROM materials WHERE barcode = ? OR material_code = ? OR material_id = ? LIMIT 1");
+    $stmt->execute([$code, $code, is_numeric($code) ? (int)$code : 0]);
     $material = $stmt->fetch();
 
     if (!$material) {
@@ -70,7 +70,19 @@ $unit_stmt->execute([$current_unit_id]);
 $current_unit = $unit_stmt->fetch();
 
 // ดึงรายการวัสดุทั้งหมดสำหรับตัวเลือกจำลองการสแกน (Quick Scan Simulator)
-$all_materials = $pdo->query("SELECT material_id, material_code, material_name, category FROM materials ORDER BY material_id ASC")->fetchAll();
+$all_materials = $pdo->query("SELECT material_id, material_code, barcode, material_name, category FROM materials ORDER BY material_id ASC")->fetchAll();
+
+// ดึงประวัติการจ่ายใช้กับผู้รับบริการ (คนไข้) ล่าสุดของหน่วยนี้
+$patient_usages_stmt = $pdo->prepare("
+    SELECT u.*, m.material_code, m.barcode, m.material_name, m.unit_unit
+    FROM unit_usages u
+    JOIN materials m ON u.material_id = m.material_id
+    WHERE u.unit_id = ?
+    ORDER BY u.usage_id DESC
+    LIMIT 15
+");
+$patient_usages_stmt->execute([$current_unit_id]);
+$recent_patient_usages = $patient_usages_stmt->fetchAll();
 
 $req_enabled = getSetting('requisition_enabled', '1') === '1';
 $closed_reason = getSetting('requisition_closed_reason', 'ระบบปิดรับการเบิกพัสดุชั่วคราวเพื่อตรวจนับสต็อกประจำงวด');
@@ -400,25 +412,95 @@ $closed_reason = getSetting('requisition_closed_reason', 'ระบบปิด�
         <div class="border rounded-4 p-3 bg-light">
             <ul class="nav nav-pills nav-fill mb-3" id="actionPills">
                 <li class="nav-item">
-                    <button class="nav-link active fw-semibold" id="pill-use-tab" data-bs-toggle="pill" data-bs-target="#pill-use">
-                        <i class="fa-solid fa-hand-holding-medical me-2"></i> 1. เบิกใช้ในห้องตนเอง
+                    <button class="nav-link active fw-semibold text-danger" id="pill-patient-tab" data-bs-toggle="pill" data-bs-target="#pill-patient">
+                        <i class="fa-solid fa-hospital-user me-2"></i> 1. จ่ายให้ผู้รับบริการ (คนไข้)
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link fw-semibold" id="pill-use-tab" data-bs-toggle="pill" data-bs-target="#pill-use">
+                        <i class="fa-solid fa-hand-holding-medical me-2"></i> 2. เบิกใช้ในห้องตนเอง
                     </button>
                 </li>
                 <li class="nav-item">
                     <button class="nav-link fw-semibold" id="pill-req-tab" data-bs-toggle="pill" data-bs-target="#pill-req">
-                        <i class="fa-solid fa-arrow-down-to-bracket me-2"></i> 2. ขอเบิกคลังกลาง
+                        <i class="fa-solid fa-arrow-down-to-bracket me-2"></i> 3. ขอเบิกคลังกลาง
                     </button>
                 </li>
                 <li class="nav-item">
                     <button class="nav-link fw-semibold" id="pill-borrow-tab" data-bs-toggle="pill" data-bs-target="#pill-borrow">
-                        <i class="fa-solid fa-handshake me-2"></i> 3. ขอยืมหน่วยอื่น
+                        <i class="fa-solid fa-handshake me-2"></i> 4. ขอยืมหน่วยอื่น
                     </button>
                 </li>
             </ul>
 
             <div class="tab-content bg-white p-4 rounded-3 border">
-                <!-- Option 1: เบิกใช้ในห้องตนเอง -->
-                <div class="tab-pane fade show active" id="pill-use">
+                
+                <!-- Option 1: สแกนจ่ายให้ผู้รับบริการ (คนไข้) -->
+                <div class="tab-pane fade show active" id="pill-patient">
+                    <form method="POST" action="borrow_action.php">
+                        <input type="hidden" name="action" value="dispense_to_patient">
+                        <input type="hidden" name="material_id" id="formPatientMaterialId">
+                        <input type="hidden" name="current_unit_id" value="<?= $current_unit_id ?>">
+                        <input type="hidden" name="redirect_to" value="unit/scan.php">
+
+                        <div class="alert alert-danger bg-danger-subtle border-danger-subtle text-danger p-2 px-3 rounded-3 small mb-3">
+                            <i class="fa-solid fa-circle-info me-1"></i> ยิงบาร์โค้ดสายรัดข้อมือ หรือกรอก HN และชื่อคนไข้เพื่อตัดจ่ายเวชภัณฑ์สำหรับผู้รับบริการ
+                        </div>
+
+                        <div class="row g-3">
+                            <!-- รหัส HN คนไข้ -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-dark">
+                                    <i class="fa-solid fa-barcode text-danger me-1"></i>รหัสคนไข้ (HN) <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" name="patient_hn" id="patientHnInput" class="form-control form-control-lg font-monospace fw-bold" placeholder="เช่น HN-690124" required autofocus>
+                                <small class="text-muted">ยิงบาร์โค้ดข้อมือผู้ป่วยได้</small>
+                            </div>
+
+                            <!-- ชื่อ-สกุล คนไข้ -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-dark">ชื่อ-สกุล ผู้รับบริการ (คนไข้) <span class="text-danger">*</span></label>
+                                <input type="text" name="patient_name" class="form-control form-control-lg" placeholder="เช่น นายสมคิด ยั่งยืน" required>
+                            </div>
+
+                            <!-- เตียง / ห้อง -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold text-secondary">เตียง / ห้องตรวจ</label>
+                                <input type="text" name="bed_no" class="form-control form-control-lg" placeholder="เช่น เตียง 2 หรือ ห้องฉุกเฉิน 1">
+                            </div>
+
+                            <!-- จำนวนที่จ่าย -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-dark">จำนวนที่จ่ายให้คนไข้ <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" name="quantity" id="formPatientQty" class="form-control form-control-lg fw-bold text-danger" value="1" min="1" required>
+                                    <span class="input-group-text bg-light patient-unit-label">ชิ้น</span>
+                                </div>
+                            </div>
+
+                            <!-- หัตถการ / วัตถุประสงค์ -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold text-secondary">หัตถการ / การรักษา</label>
+                                <input type="text" name="procedure" class="form-control form-control-lg" placeholder="เช่น ทำแผล, ฉีดยา, เย็บแผล">
+                            </div>
+
+                            <!-- ผู้จ่าย (พยาบาล/เจ้าหน้าที่) -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold text-secondary">ผู้บันทึกจ่าย</label>
+                                <input type="text" name="used_by" class="form-control form-control-lg" value="<?= h($_SESSION['full_name']) ?>" required>
+                            </div>
+
+                            <div class="col-12 mt-3">
+                                <button type="submit" class="btn btn-danger btn-lg w-100 rounded-3 shadow-sm py-3 fw-bold" id="btnSubmitPatient">
+                                    <i class="fa-solid fa-hospital-user me-2"></i> ยืนยันตัดจ่ายเวชภัณฑ์ให้ผู้รับบริการ (คนไข้)
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Option 2: เบิกใช้ในห้องตนเองทั่วไป -->
+                <div class="tab-pane fade" id="pill-use">
                     <form method="POST" action="borrow_action.php">
                         <input type="hidden" name="action" value="use_internal_material">
                         <input type="hidden" name="material_id" id="formUseMaterialId">
@@ -435,19 +517,19 @@ $closed_reason = getSetting('requisition_closed_reason', 'ระบบปิด�
                                 <input type="text" name="used_by" class="form-control form-control-lg rounded-3" value="<?= h($_SESSION['full_name']) ?>" required>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold">ผู้ป่วย / เตียง / วัตถุประสงค์</label>
-                                <input type="text" name="patient_or_purpose" class="form-control form-control-lg rounded-3" placeholder="เช่น ผู้ป่วยเตียง 4 หรือ ทำแผลฉุกเฉิน">
+                                <label class="form-label fw-semibold">วัตถุประสงค์การใช้ในห้อง</label>
+                                <input type="text" name="patient_or_purpose" class="form-control form-control-lg rounded-3" placeholder="เช่น ทำความสะอาดอุปกรณ์ประจำห้อง">
                             </div>
                             <div class="col-12 mt-3">
-                                <button type="submit" class="btn btn-danger btn-lg w-100 rounded-3 shadow-sm" id="btnSubmitUse">
-                                    <i class="fa-solid fa-hand-holding-medical me-2"></i> ยืนยันตัดยอดนำไปใช้งานทันที
+                                <button type="submit" class="btn btn-warning text-dark btn-lg w-100 rounded-3 shadow-sm" id="btnSubmitUse">
+                                    <i class="fa-solid fa-hand-holding-medical me-2"></i> ยืนยันตัดยอดนำไปใช้ในห้องพัสดุ
                                 </button>
                             </div>
                         </div>
                     </form>
                 </div>
 
-                <!-- Option 2: ขอเบิกคลังกลาง -->
+                <!-- Option 3: ขอเบิกคลังกลาง -->
                 <div class="tab-pane fade" id="pill-req">
                     <?php if (!$req_enabled): ?>
                         <div class="alert alert-warning border-0 rounded-4 shadow-sm mb-3 d-flex align-items-center gap-3 p-3">
@@ -482,7 +564,7 @@ $closed_reason = getSetting('requisition_closed_reason', 'ระบบปิด�
                     </form>
                 </div>
 
-                <!-- Option 3: ขอยืมจากหน่วยอื่น -->
+                <!-- Option 4: ขอยืมจากหน่วยอื่น -->
                 <div class="tab-pane fade" id="pill-borrow">
                     <form method="POST" action="borrow_action.php">
                         <input type="hidden" name="action" value="request_borrow">
@@ -518,6 +600,56 @@ $closed_reason = getSetting('requisition_closed_reason', 'ระบบปิด�
                     </form>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ตารางประวัติการจ่ายเวชภัณฑ์ให้คนไข้ (ผู้รับบริการ) ล่าสุด -->
+    <div class="card p-4 rounded-4 border shadow-sm bg-white mt-4">
+        <h5 class="fw-bold text-dark mb-3">
+            <i class="fa-solid fa-clock-rotate-left text-danger me-2"></i>ประวัติการจ่ายเวชภัณฑ์ให้ผู้รับบริการ (คนไข้) ล่าสุด
+        </h5>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>วัน-เวลา</th>
+                        <th>HN ผู้ป่วย</th>
+                        <th>ชื่อผู้รับบริการ (คนไข้)</th>
+                        <th>รายการเวชภัณฑ์</th>
+                        <th class="text-end">จำนวนที่ใช้</th>
+                        <th>หัตถการ / วัตถุประสงค์</th>
+                        <th>ผู้บันทึกจ่าย</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($recent_patient_usages)): ?>
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">ยังไม่มีประวัติการเบิกจ่ายให้คนไข้ในแผนกนี้</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($recent_patient_usages as $pu): ?>
+                            <tr>
+                                <td class="small text-secondary"><?= thaiDate($pu['used_at'], true) ?></td>
+                                <td>
+                                    <?php if (!empty($pu['patient_hn'])): ?>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-semibold">
+                                            <?= h($pu['patient_hn']) ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="fw-bold text-dark"><?= h($pu['patient_name'] ?: 'ผู้รับบริการทั่วไป') ?></td>
+                                <td>[<?= h($pu['material_code']) ?>] <?= h($pu['material_name']) ?></td>
+                                <td class="text-end fw-bold text-danger">-<?= number_format($pu['quantity']) ?> <?= h($pu['unit_unit']) ?></td>
+                                <td class="small text-secondary"><?= h($pu['patient_or_purpose'] ?: '-') ?></td>
+                                <td class="small text-muted"><?= h($pu['used_by']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -630,6 +762,26 @@ $closed_reason = getSetting('requisition_closed_reason', 'ระบบปิด�
 
         document.getElementById('resUnit1').innerText = m.unit_unit;
         document.getElementById('resUnit2').innerText = m.unit_unit;
+
+        // ฟอร์มจ่ายให้ผู้รับบริการ (คนไข้)
+        document.getElementById('formPatientMaterialId').value = m.material_id;
+        document.getElementById('formPatientQty').max = data.my_stock;
+        document.querySelectorAll('.patient-unit-label').forEach(el => el.textContent = m.unit_unit || 'ชิ้น');
+
+        if (data.my_stock <= 0) {
+            document.getElementById('btnSubmitPatient').disabled = true;
+            document.getElementById('btnSubmitPatient').innerHTML = '<i class="fa-solid fa-ban me-2"></i> เวชภัณฑ์ในห้องหมด (ไม่มียอดให้จ่ายคนไข้)';
+        } else {
+            document.getElementById('btnSubmitPatient').disabled = false;
+            document.getElementById('btnSubmitPatient').innerHTML = '<i class="fa-solid fa-hospital-user me-2"></i> ยืนยันตัดจ่ายเวชภัณฑ์ให้ผู้รับบริการ (คนไข้)';
+            // Focus HN input
+            setTimeout(() => {
+                const hnInput = document.getElementById('patientHnInput');
+                if (hnInput && !hnInput.value) {
+                    hnInput.focus();
+                }
+            }, 300);
+        }
 
         // ฟอร์มเบิกใช้ในห้องตนเอง
         document.getElementById('formUseMaterialId').value = m.material_id;

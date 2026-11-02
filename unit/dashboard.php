@@ -361,8 +361,8 @@ $flash = getFlash();
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="<?= BASE_URL ?>/unit/scan.php">
-                        <i class="fa-solid fa-qrcode me-1 text-warning"></i> สแกน QR เบิก/ยืม
+                    <a class="nav-link fw-bold text-warning" href="<?= BASE_URL ?>/unit/scan.php<?= isset($_GET['unit_id']) ? '?unit_id='.$current_unit_id : '' ?>">
+                        <i class="fa-solid fa-barcode me-1"></i> สแกนบาร์โค้ดจ่ายคนไข้
                     </a>
                 </li>
             </ul>

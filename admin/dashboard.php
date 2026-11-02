@@ -16,9 +16,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 1. เพิ่มรายการวัสดุใหม่เข้าระบบ
     if ($action === 'add_material') {
         $material_code = trim($_POST['material_code'] ?? '');
+        $barcode       = trim($_POST['barcode'] ?? '') ?: $material_code;
         $material_name = trim($_POST['material_name'] ?? '');
         $category      = trim($_POST['category'] ?? 'เวชภัณฑ์สิ้นเปลือง');
         $unit_unit     = trim($_POST['unit_unit'] ?? 'ชิ้น');
+        $unit_price    = max(0, (float)($_POST['unit_price'] ?? 0));
+        $supplier      = trim($_POST['supplier'] ?? 'องค์การเภสัชกรรม (GPO)');
+        $lot_no        = trim($_POST['lot_no'] ?? '');
+        $exp_date      = !empty($_POST['exp_date']) ? $_POST['exp_date'] : null;
         $min_stock     = max(0, (int)($_POST['min_stock'] ?? 10));
         $description   = trim($_POST['description'] ?? '');
         $initial_stock = max(0, (int)($_POST['initial_stock'] ?? 0));
@@ -28,10 +33,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->beginTransaction();
 
                 $stmt = $pdo->prepare("
-                    INSERT INTO materials (material_code, material_name, category, unit_unit, min_stock, description)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO materials (material_code, barcode, material_name, category, unit_unit, unit_price, supplier, lot_no, exp_date, min_stock, description)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$material_code, $material_name, $category, $unit_unit, $min_stock, $description]);
+                $stmt->execute([$material_code, $barcode, $material_name, $category, $unit_unit, $unit_price, $supplier, $lot_no, $exp_date, $min_stock, $description]);
                 $new_material_id = $pdo->lastInsertId();
 
                 // บันทึกสต็อกเริ่มต้นลงในคลังกลาง (Unit ID = 1)
@@ -43,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stock_stmt->execute([$central_unit_id, $new_material_id, $initial_stock]);
 
                 if ($initial_stock > 0) {
-                    logStockMovement($pdo, $new_material_id, $central_unit_id, 'in', $initial_stock, 'initial', null, 'ยอดยกมาเริ่มต้นคลังกลาง', $_SESSION['user_id']);
+                    logStockMovement($pdo, $new_material_id, $central_unit_id, 'in', $initial_stock, 'initial', null, 'ยอดยกมาเริ่มต้นคลังกลาง', $_SESSION['user_id'], $unit_price, $supplier);
                 }
 
                 $pdo->commit();
@@ -66,19 +71,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 2. แก้ไขข้อมูลวัสดุ
     if ($action === 'edit_material') {
         $material_id   = (int)($_POST['material_id'] ?? 0);
+        $barcode       = trim($_POST['barcode'] ?? '');
         $material_name = trim($_POST['material_name'] ?? '');
         $category      = trim($_POST['category'] ?? '');
         $unit_unit     = trim($_POST['unit_unit'] ?? '');
+        $unit_price    = max(0, (float)($_POST['unit_price'] ?? 0));
+        $supplier      = trim($_POST['supplier'] ?? '');
+        $lot_no        = trim($_POST['lot_no'] ?? '');
+        $exp_date      = !empty($_POST['exp_date']) ? $_POST['exp_date'] : null;
         $min_stock     = max(0, (int)($_POST['min_stock'] ?? 10));
         $description   = trim($_POST['description'] ?? '');
 
         if ($material_id > 0 && !empty($material_name)) {
             $stmt = $pdo->prepare("
                 UPDATE materials 
-                SET material_name = ?, category = ?, unit_unit = ?, min_stock = ?, description = ?
+                SET barcode = ?, material_name = ?, category = ?, unit_unit = ?, unit_price = ?, supplier = ?, lot_no = ?, exp_date = ?, min_stock = ?, description = ?
                 WHERE material_id = ?
             ");
-            $stmt->execute([$material_name, $category, $unit_unit, $min_stock, $description, $material_id]);
+            $stmt->execute([$barcode, $material_name, $category, $unit_unit, $unit_price, $supplier, $lot_no, $exp_date, $min_stock, $description, $material_id]);
             setFlash('success', "อัปเดตข้อมูลพัสดุเรียบร้อยแล้ว");
         }
         header("Location: dashboard.php");
@@ -147,6 +157,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ดึงหมวดหมู่ทั้งหมดจากตาราง categories
 $categories_stmt = $pdo->query("SELECT * FROM categories ORDER BY category_id ASC");
 $categories = $categories_stmt->fetchAll();
+
+// ดึงรายชื่อบริษัทผู้จัดจำหน่าย/จัดซื้อ
+$suppliers_stmt = $pdo->query("SELECT * FROM suppliers ORDER BY supplier_name ASC");
+$suppliers = $suppliers_stmt->fetchAll();
 
 // ดึงข้อมูลสถิติภาพรวมคลังกลาง
 $stats = [
@@ -414,8 +428,28 @@ $flash = getFlash();
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link fw-semibold text-warning" href="stock_in_out.php">
+                        <i class="fa-solid fa-barcode me-1"></i> รับเข้า-จ่ายออกบาร์โค้ด
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="subunits_stock.php">
+                        <i class="fa-solid fa-hospital-user me-1"></i> สต็อกคลังย่อย
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="refill.php">
+                        <i class="fa-solid fa-dolly me-1"></i> ระบบ Refill
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="reports.php">
+                        <i class="fa-solid fa-chart-pie me-1"></i> รายงานสถิติ
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="#requisitions_section">
-                        <i class="fa-solid fa-file-invoice me-1"></i> ใบขอเบิกพัสดุ
+                        <i class="fa-solid fa-file-invoice me-1"></i> ใบขอเบิก
                         <?php if ($stats['pending_reqs'] > 0): ?>
                             <span class="badge bg-danger rounded-pill ms-1"><?= $stats['pending_reqs'] ?></span>
                         <?php endif; ?>
@@ -423,28 +457,20 @@ $flash = getFlash();
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="scan_approve.php">
-                        <i class="fa-solid fa-qrcode me-1 text-warning"></i> สแกน QR อนุมัติเบิก
+                        <i class="fa-solid fa-qrcode me-1 text-light"></i> สแกน QR อนุมัติ
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="users.php">
-                        <i class="fa-solid fa-users-gear me-1"></i> จัดการผู้ใช้
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-gear me-1"></i> จัดการระบบ
                     </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="units.php">
-                        <i class="fa-solid fa-hospital-user me-1"></i> จัดการหน่วยงาน
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="categories.php">
-                        <i class="fa-solid fa-tags me-1"></i> จัดการหมวดหมู่
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="settings.php">
-                        <i class="fa-solid fa-sliders me-1"></i> ตั้งค่าระบบ
-                    </a>
+                    <ul class="dropdown-menu border-0 shadow">
+                        <li><a class="dropdown-item" href="users.php"><i class="fa-solid fa-users-gear me-2 text-primary"></i>ผู้ใช้งาน</a></li>
+                        <li><a class="dropdown-item" href="units.php"><i class="fa-solid fa-hospital me-2 text-success"></i>หน่วยงาน/แผนก</a></li>
+                        <li><a class="dropdown-item" href="categories.php"><i class="fa-solid fa-tags me-2 text-warning"></i>หมวดหมู่</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="settings.php"><i class="fa-solid fa-sliders me-2 text-secondary"></i>ตั้งค่าระบบ</a></li>
+                    </ul>
                 </li>
             </ul>
 
@@ -870,6 +896,8 @@ $flash = getFlash();
                         <th>ชื่อพัสดุ / เวชภัณฑ์</th>
                         <th>หมวดหมู่</th>
                         <th>หน่วยนับ</th>
+                        <th class="text-end">ราคา/หน่วย</th>
+                        <th>บริษัทคู่ค้า (Supplier)</th>
                         <th class="text-center">สต็อกคลังกลาง</th>
                         <th class="text-center">เกณฑ์ขั้นต่ำ (Min)</th>
                         <th class="text-center">สถานะ</th>
@@ -908,6 +936,8 @@ $flash = getFlash();
                             </td>
                             <td><span class="badge bg-secondary bg-opacity-10 text-secondary border"><?= h($item['category']) ?></span></td>
                             <td><?= h($item['unit_unit']) ?></td>
+                            <td class="text-end fw-semibold text-dark"><?= number_format($item['unit_price'] ?? 0, 2) ?> ฿</td>
+                            <td class="small text-secondary"><?= h($item['supplier'] ?: 'องค์การเภสัชกรรม (GPO)') ?></td>
                             <td class="text-center">
                                 <span class="fs-6 fw-bold <?= $stock <= $min ? 'text-danger' : 'text-success' ?>">
                                     <?= number_format($stock) ?>
@@ -1021,6 +1051,10 @@ $flash = getFlash();
                             <input type="text" name="material_code" class="form-control rounded-3 font-monospace" placeholder="เช่น MAT-1011" required>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label fw-semibold">รหัสบาร์โค้ด (Barcode)</label>
+                            <input type="text" name="barcode" class="form-control rounded-3 font-monospace" placeholder="ยิงบาร์โค้ด หรือเว้นว่างเพื่อใช้รหัสพัสดุ">
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">หมวดหมู่ <span class="text-danger">*</span></label>
                             <select name="category" class="form-select rounded-3" required>
                                 <?php foreach ($categories as $cat): ?>
@@ -1028,21 +1062,41 @@ $flash = getFlash();
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">บริษัทที่จัดซื้อ (Supplier)</label>
+                            <select name="supplier" class="form-select rounded-3">
+                                <?php foreach ($suppliers as $sup): ?>
+                                    <option value="<?= h($sup['supplier_name']) ?>"><?= h($sup['supplier_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">ชื่อพัสดุ / เวชภัณฑ์ <span class="text-danger">*</span></label>
                             <input type="text" name="material_name" class="form-control rounded-3" placeholder="เช่น กระบอกฉีดยา ขนาด 20 มล." required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">หน่วยนับ <span class="text-danger">*</span></label>
                             <input type="text" name="unit_unit" class="form-control rounded-3" placeholder="เช่น กล่อง, ขวด, เครื่อง" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">ราคาต่อหน่วย (บาท)</label>
+                            <input type="number" step="0.01" name="unit_price" class="form-control rounded-3" value="0.00" min="0">
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">เกณฑ์ขั้นต่ำ (Min Stock)</label>
                             <input type="number" name="min_stock" class="form-control rounded-3" value="10" min="0">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">ยอดสต็อกเริ่มต้นคลังกลาง</label>
                             <input type="number" name="initial_stock" class="form-control rounded-3" value="50" min="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">เลขที่ล็อต (Lot No.)</label>
+                            <input type="text" name="lot_no" class="form-control rounded-3" placeholder="เช่น LOT-2026-001">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">วันหมดอายุ (Exp Date)</label>
+                            <input type="date" name="exp_date" class="form-control rounded-3">
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">รายละเอียดเพิ่มเติม / สเปก</label>
@@ -1077,6 +1131,10 @@ $flash = getFlash();
                             <input type="text" id="edit_material_code" class="form-control rounded-3 bg-light font-monospace" readonly>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label fw-semibold">รหัสบาร์โค้ด (Barcode)</label>
+                            <input type="text" name="barcode" id="edit_barcode" class="form-control rounded-3 font-monospace">
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">หมวดหมู่</label>
                             <select name="category" id="edit_category" class="form-select rounded-3">
                                 <?php foreach ($categories as $cat): ?>
@@ -1084,17 +1142,37 @@ $flash = getFlash();
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">บริษัทที่จัดซื้อ (Supplier)</label>
+                            <select name="supplier" id="edit_supplier" class="form-select rounded-3">
+                                <?php foreach ($suppliers as $sup): ?>
+                                    <option value="<?= h($sup['supplier_name']) ?>"><?= h($sup['supplier_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">ชื่อพัสดุ <span class="text-danger">*</span></label>
                             <input type="text" name="material_name" id="edit_material_name" class="form-control rounded-3" required>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">หน่วยนับ</label>
                             <input type="text" name="unit_unit" id="edit_unit_unit" class="form-control rounded-3" required>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">ราคาต่อหน่วย (บาท)</label>
+                            <input type="number" step="0.01" name="unit_price" id="edit_unit_price" class="form-control rounded-3" min="0">
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">เกณฑ์ขั้นต่ำ (Min Stock)</label>
                             <input type="number" name="min_stock" id="edit_min_stock" class="form-control rounded-3" min="0" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">เลขที่ล็อต (Lot No.)</label>
+                            <input type="text" name="lot_no" id="edit_lot_no" class="form-control rounded-3">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">วันหมดอายุ (Exp Date)</label>
+                            <input type="date" name="exp_date" id="edit_exp_date" class="form-control rounded-3">
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">รายละเอียดเพิ่มเติม</label>
@@ -1563,10 +1641,15 @@ $flash = getFlash();
     function openEditModal(item) {
         document.getElementById('edit_material_id').value = item.material_id;
         document.getElementById('edit_material_code').value = item.material_code;
+        document.getElementById('edit_barcode').value = item.barcode || item.material_code;
         document.getElementById('edit_material_name').value = item.material_name;
         document.getElementById('edit_category').value = item.category || '';
+        document.getElementById('edit_supplier').value = item.supplier || '';
         document.getElementById('edit_unit_unit').value = item.unit_unit;
+        document.getElementById('edit_unit_price').value = item.unit_price || 0;
         document.getElementById('edit_min_stock').value = item.min_stock;
+        document.getElementById('edit_lot_no').value = item.lot_no || '';
+        document.getElementById('edit_exp_date').value = item.exp_date || '';
         document.getElementById('edit_description').value = item.description || '';
         new bootstrap.Modal(document.getElementById('editMaterialModal')).show();
     }
@@ -1716,6 +1799,34 @@ $flash = getFlash();
                 <div>
                     <div class="fw-semibold text-dark">คลังกลาง & บัญชีพัสดุ</div>
                     <small class="text-muted">ดูรายการวัสดุและสต็อกคงคลังกลาง</small>
+                </div>
+            </a>
+            <a href="stock_in_out.php" class="list-group-item list-group-item-action py-3 px-3 d-flex align-items-center">
+                <i class="fa-solid fa-barcode me-3 text-warning fa-lg" style="width: 24px;"></i>
+                <div>
+                    <div class="fw-semibold text-dark">รับเข้า – จ่ายออกบาร์โค้ด</div>
+                    <small class="text-muted">ยิงปืนบาร์โค้ด/กล้อง รับของจากบริษัท และจ่ายออก</small>
+                </div>
+            </a>
+            <a href="subunits_stock.php" class="list-group-item list-group-item-action py-3 px-3 d-flex align-items-center">
+                <i class="fa-solid fa-hospital-user me-3 text-info fa-lg" style="width: 24px;"></i>
+                <div>
+                    <div class="fw-semibold text-dark">สต็อกคลังย่อย (Monitor & Control)</div>
+                    <small class="text-muted">ส่องดูยอดคงเหลือคลังย่อยและควบคุมการจ่าย</small>
+                </div>
+            </a>
+            <a href="refill.php" class="list-group-item list-group-item-action py-3 px-3 d-flex align-items-center">
+                <i class="fa-solid fa-dolly me-3 text-success fa-lg" style="width: 24px;"></i>
+                <div>
+                    <div class="fw-semibold text-dark">ระบบ Refill เวชภัณฑ์</div>
+                    <small class="text-muted">แนะนำเติมสต็อกอัตโนมัติ (Smart Refill)</small>
+                </div>
+            </a>
+            <a href="reports.php" class="list-group-item list-group-item-action py-3 px-3 d-flex align-items-center">
+                <i class="fa-solid fa-chart-pie me-3 text-danger fa-lg" style="width: 24px;"></i>
+                <div>
+                    <div class="fw-semibold text-dark">ระบบประมวลผลรายงานสถิติ</div>
+                    <small class="text-muted">รายงานรับ-จ่าย, Stock Card, บริษัท, มูลค่าคลัง</small>
                 </div>
             </a>
             <a href="#requisitions_section" class="list-group-item list-group-item-action py-3 px-3 d-flex align-items-center justify-content-between" data-bs-dismiss="offcanvas">
