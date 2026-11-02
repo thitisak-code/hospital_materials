@@ -50,11 +50,6 @@ try {
     die("Database Connection Error: " . htmlspecialchars($e->getMessage()));
 }
 
-// ระบบ Migration ตารางและฟิลด์อัตโนมัติตามความต้องการของระบบ
-if (file_exists(__DIR__ . '/database/auto_migrate.php')) {
-    require_once __DIR__ . '/database/auto_migrate.php';
-}
-
 // 5. ระบบตรวจสอบ Cookie (Remember Me) อัตโนมัติ
 if (!isset($_SESSION['user_id']) && !empty($_COOKIE['remember_token'])) {
     $token = $_COOKIE['remember_token'];
@@ -159,35 +154,20 @@ function thaiDate($datetime, $showTime = true) {
 
 /**
  * บันทึกประวัติการเคลื่อนไหว เข้า-ออก ของพัสดุ (In-Out Stock Movements)
- * รองรับการบันทึกราคาต่อหน่วย, มูลค่ารวม, และบริษัทผู้จัดซื้อ เพื่อออกรายงาน
  */
 if (!function_exists('logStockMovement')) {
-    function logStockMovement($pdo, $material_id, $unit_id, $type, $qty, $ref_type, $ref_id, $desc, $user_id, $unit_price = null, $supplier = null) {
+    function logStockMovement($pdo, $material_id, $unit_id, $type, $qty, $ref_type, $ref_id, $desc, $user_id) {
         try {
             $stk = $pdo->prepare("SELECT quantity FROM unit_stocks WHERE unit_id = ? AND material_id = ?");
             $stk->execute([$unit_id, $material_id]);
             $bal = $stk->fetchColumn();
             $balance_after = ($bal !== false) ? (int)$bal : null;
 
-            if ($unit_price === null || $supplier === null) {
-                $mat_stmt = $pdo->prepare("SELECT unit_price, supplier FROM materials WHERE material_id = ?");
-                $mat_stmt->execute([$material_id]);
-                $mat_info = $mat_stmt->fetch();
-                if ($mat_info) {
-                    if ($unit_price === null) $unit_price = (float)$mat_info['unit_price'];
-                    if ($supplier === null) $supplier = $mat_info['supplier'];
-                } else {
-                    if ($unit_price === null) $unit_price = 0.00;
-                    if ($supplier === null) $supplier = '';
-                }
-            }
-            $total_price = (float)$unit_price * (int)$qty;
-
             $stmt = $pdo->prepare("
-                INSERT INTO stock_movements (material_id, unit_id, movement_type, quantity, balance_after, reference_type, reference_id, description, performed_by, unit_price, total_price, supplier, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO stock_movements (material_id, unit_id, movement_type, quantity, balance_after, reference_type, reference_id, description, performed_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
-            $stmt->execute([$material_id, $unit_id, $type, $qty, $balance_after, $ref_type, $ref_id, $desc, $user_id, $unit_price, $total_price, $supplier]);
+            $stmt->execute([$material_id, $unit_id, $type, $qty, $balance_after, $ref_type, $ref_id, $desc, $user_id]);
         } catch (\Exception $e) {
             // ไม่ให้กระทบการทำงานหลัก
         }

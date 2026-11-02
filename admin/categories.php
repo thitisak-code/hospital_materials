@@ -128,10 +128,6 @@ $flash = getFlash();
         h1, h2, h3, h4, h5, .nav-link, .btn {
             font-family: 'Prompt', sans-serif;
         }
-        .navbar-mhk {
-            background: linear-gradient(135deg, var(--mhk-primary-dark) 0%, var(--mhk-primary) 100%);
-            box-shadow: 0 4px 15px rgba(0, 77, 64, 0.15);
-        }
         .content-card {
             background: #ffffff;
             border-radius: 16px;
@@ -212,50 +208,17 @@ $flash = getFlash();
             body {
                 padding-bottom: 78px !important;
             }
-            .navbar-mhk .navbar-brand {
-                font-size: 0.92rem;
-            }
         }
     </style>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/app.css?v=20261102">
+<script src="<?= BASE_URL ?>/assets/app.js?v=20261102" defer></script>
 </head>
 <body>
 
 <?php renderLoadingScreen(); ?>
 
 <!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark navbar-mhk sticky-top py-2">
-    <div class="container-fluid px-lg-4">
-        <a class="navbar-brand d-flex align-items-center" href="dashboard.php">
-            <span class="bg-white text-dark rounded-circle p-2 me-2 d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                <i class="fa-solid fa-hospital text-teal fa-lg" style="color: var(--mhk-primary);"></i>
-            </span>
-            <div>
-                <span class="fw-bold d-block lh-1 fs-6 fs-md-5">โรงพยาบาลมหาสารคาม</span>
-                <span class="small opacity-75 fs-7">ระบบคลังใหญ่ & พัสดุกลาง (Super Admin)</span>
-            </div>
-        </a>
-
-        <div class="d-flex align-items-center gap-2 d-lg-none">
-            <a href="dashboard.php" class="btn btn-sm btn-outline-light"><i class="fa-solid fa-warehouse me-1"></i> คลังกลาง</a>
-        </div>
-
-        <div class="collapse navbar-collapse" id="adminNavbar">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3">
-                <li class="nav-item"><a class="nav-link" href="dashboard.php"><i class="fa-solid fa-warehouse me-1"></i> คลังกลาง</a></li>
-                <li class="nav-item"><a class="nav-link" href="dashboard.php#requisitions_section"><i class="fa-solid fa-file-invoice me-1"></i> ใบขอเบิกพัสดุ</a></li>
-                <li class="nav-item"><a class="nav-link" href="scan_approve.php"><i class="fa-solid fa-qrcode me-1 text-warning"></i> สแกน QR อนุมัติเบิก</a></li>
-                <li class="nav-item"><a class="nav-link" href="users.php"><i class="fa-solid fa-users-gear me-1"></i> จัดการผู้ใช้</a></li>
-                <li class="nav-item"><a class="nav-link" href="units.php"><i class="fa-solid fa-hospital-user me-1"></i> จัดการหน่วยงาน</a></li>
-                <li class="nav-item"><a class="nav-link active" href="categories.php"><i class="fa-solid fa-tags me-1"></i> จัดการหมวดหมู่</a></li>
-                <li class="nav-item"><a class="nav-link" href="settings.php"><i class="fa-solid fa-sliders me-1"></i> ตั้งค่าระบบ</a></li>
-            </ul>
-
-            <div class="d-flex align-items-center gap-2">
-                <a href="<?= BASE_URL ?>/logout.php" class="btn btn-sm btn-outline-light"><i class="fa-solid fa-arrow-right-from-bracket me-1"></i> ออกจากระบบ</a>
-            </div>
-        </div>
-    </div>
-</nav>
+<?php require __DIR__ . '/../includes/navigation.php'; ?>
 
 <!-- Mobile Bottom Navigation Bar (สำหรับโทรศัพท์มือถือ Super Admin) -->
 <nav class="mobile-bottom-nav d-lg-none">

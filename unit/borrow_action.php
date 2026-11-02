@@ -29,32 +29,18 @@ function handleRedirect($defaultUrl, $redirect_to = '') {
 
 // ฟังก์ชันบันทึกประวัติการเคลื่อนไหว เข้า-ออก ของวัสดุ
 if (!function_exists('logStockMovement')) {
-    function logStockMovement($pdo, $material_id, $unit_id, $type, $qty, $ref_type, $ref_id, $desc, $user_id, $unit_price = null, $supplier = null) {
+    function logStockMovement($pdo, $material_id, $unit_id, $type, $qty, $ref_type, $ref_id, $desc, $user_id) {
         try {
             $stk = $pdo->prepare("SELECT quantity FROM unit_stocks WHERE unit_id = ? AND material_id = ?");
             $stk->execute([$unit_id, $material_id]);
             $bal = $stk->fetchColumn();
             $balance_after = ($bal !== false) ? (int)$bal : null;
 
-            if ($unit_price === null || $supplier === null) {
-                $mat_stmt = $pdo->prepare("SELECT unit_price, supplier FROM materials WHERE material_id = ?");
-                $mat_stmt->execute([$material_id]);
-                $mat_info = $mat_stmt->fetch();
-                if ($mat_info) {
-                    if ($unit_price === null) $unit_price = (float)$mat_info['unit_price'];
-                    if ($supplier === null) $supplier = $mat_info['supplier'];
-                } else {
-                    if ($unit_price === null) $unit_price = 0.00;
-                    if ($supplier === null) $supplier = '';
-                }
-            }
-            $total_price = (float)$unit_price * (int)$qty;
-
             $stmt = $pdo->prepare("
-                INSERT INTO stock_movements (material_id, unit_id, movement_type, quantity, balance_after, reference_type, reference_id, description, performed_by, unit_price, total_price, supplier, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO stock_movements (material_id, unit_id, movement_type, quantity, balance_after, reference_type, reference_id, description, performed_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
-            $stmt->execute([$material_id, $unit_id, $type, $qty, $balance_after, $ref_type, $ref_id, $desc, $user_id, $unit_price, $total_price, $supplier]);
+            $stmt->execute([$material_id, $unit_id, $type, $qty, $balance_after, $ref_type, $ref_id, $desc, $user_id]);
         } catch (\Exception $e) {
             // เงียบไว้เพื่อไม่ให้กระทบกระบวนการหลัก
         }
@@ -247,64 +233,6 @@ if ($action === 'reject_requisition') {
     }
 
     handleRedirect(BASE_URL . "/admin/dashboard.php#requisitions_section", $redirect_to);
-}
-
-// -------------------------------------------------------------
-// 3.9 สแกนบาร์โค้ดจ่ายเวชภัณฑ์ให้ผู้รับบริการ (คนไข้) โดยตรง
-// -------------------------------------------------------------
-if ($action === 'dispense_to_patient') {
-    $material_id   = (int)($_POST['material_id'] ?? 0);
-    $quantity      = (int)($_POST['quantity'] ?? 0);
-    $patient_hn    = trim($_POST['patient_hn'] ?? '');
-    $patient_name  = trim($_POST['patient_name'] ?? 'ผู้รับบริการ');
-    $bed_no        = trim($_POST['bed_no'] ?? '');
-    $procedure     = trim($_POST['procedure'] ?? '');
-    $used_by       = trim($_POST['used_by'] ?? $_SESSION['full_name']);
-
-    if ($material_id <= 0 || $quantity <= 0) {
-        setFlash('danger', 'กรุณาระบุรายการเวชภัณฑ์และจำนวนที่ใช้ให้ถูกต้อง');
-        handleRedirect("scan.php?unit_id=" . $current_unit_id, $redirect_to);
-    }
-
-    try {
-        $pdo->beginTransaction();
-
-        $stock_stmt = $pdo->prepare("SELECT quantity FROM unit_stocks WHERE unit_id = ? AND material_id = ? FOR UPDATE");
-        $stock_stmt->execute([$current_unit_id, $material_id]);
-        $stock = (int)$stock_stmt->fetchColumn();
-
-        if ($stock < $quantity) {
-            $pdo->rollBack();
-            setFlash('danger', "เวชภัณฑ์ในห้องพัสดุมีเพียง {$stock} หน่วย ไม่เพียงพอต่อการจ่ายให้คนไข้ ({$quantity} หน่วย)");
-            handleRedirect("scan.php?unit_id=" . $current_unit_id, $redirect_to);
-        }
-
-        // 1. ตัดสต็อกออกจากห้องพัสดุของคลังย่อย
-        $deduct_stmt = $pdo->prepare("UPDATE unit_stocks SET quantity = quantity - ? WHERE unit_id = ? AND material_id = ?");
-        $deduct_stmt->execute([$quantity, $current_unit_id, $material_id]);
-
-        // 2. บันทึกลง unit_usages
-        $purpose = "ใช้กับผู้ป่วย: {$patient_name}" . ($bed_no ? " (เตียง {$bed_no})" : "") . ($procedure ? " - {$procedure}" : "");
-        $log_stmt = $pdo->prepare("
-            INSERT INTO unit_usages (unit_id, material_id, patient_hn, patient_name, quantity, used_by, patient_or_purpose, used_at, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-        ");
-        $log_stmt->execute([$current_unit_id, $material_id, $patient_hn, $patient_name, $quantity, $used_by, $purpose, $user_id]);
-
-        // 3. บันทึกลง stock_movements
-        $mat = $pdo->query("SELECT * FROM materials WHERE material_id = {$material_id}")->fetch();
-        $ref_hn = !empty($patient_hn) ? $patient_hn : ('HN-' . date('Ymd'));
-        $desc = "จ่ายให้คนไข้: {$patient_name} (HN: {$ref_hn})" . ($bed_no ? " เตียง {$bed_no}" : "") . " โดย {$used_by}";
-        logStockMovement($pdo, $material_id, $current_unit_id, 'out', $quantity, 'patient_dispense', $ref_hn, $desc, $user_id, $mat['unit_price'], $mat['supplier']);
-
-        $pdo->commit();
-        setFlash('success', "บันทึกจ่ายเวชภัณฑ์ [{$mat['material_code']}] {$mat['material_name']} จำนวน {$quantity} {$mat['unit_unit']} ให้คนไข้ [{$ref_hn}] {$patient_name} เรียบร้อยแล้ว");
-    } catch (\Exception $e) {
-        $pdo->rollBack();
-        setFlash('danger', "เกิดข้อผิดพลาดในการบันทึกจ่ายให้คนไข้: " . $e->getMessage());
-    }
-
-    handleRedirect("scan.php?unit_id=" . $current_unit_id, $redirect_to);
 }
 
 // -------------------------------------------------------------

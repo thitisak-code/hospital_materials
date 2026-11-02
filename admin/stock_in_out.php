@@ -261,10 +261,6 @@ $flash = getFlash();
         h1, h2, h3, h4, h5, .nav-link, .btn {
             font-family: 'Prompt', sans-serif;
         }
-        .navbar-mhk {
-            background: linear-gradient(135deg, var(--mhk-primary-dark) 0%, var(--mhk-primary) 100%);
-            box-shadow: 0 4px 15px rgba(0, 77, 64, 0.2);
-        }
         .card-barcode {
             border: none;
             border-radius: 16px;
@@ -298,34 +294,15 @@ $flash = getFlash();
             font-size: 0.85rem;
         }
     </style>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/app.css?v=20261102">
+<script src="<?= BASE_URL ?>/assets/app.js?v=20261102" defer></script>
 </head>
 <body>
 
 <?php renderLoadingScreen(); ?>
 
 <!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark navbar-mhk sticky-top py-2">
-    <div class="container-fluid px-lg-4">
-        <a class="navbar-brand d-flex align-items-center" href="dashboard.php">
-            <span class="bg-white text-success rounded-circle p-2 me-2 d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                <i class="fa-solid fa-barcode fa-lg" style="color: #00796b;"></i>
-            </span>
-            <div>
-                <span class="fw-bold d-block lh-1 fs-6 fs-md-5">โรงพยาบาลมหาสารคาม</span>
-                <span class="small opacity-75 fs-7">ระบบรับเข้า – จ่ายออกเวชภัณฑ์ด้วยบาร์โค้ด</span>
-            </div>
-        </a>
-
-        <div class="d-flex align-items-center gap-2">
-            <a href="dashboard.php" class="btn btn-sm btn-light text-teal fw-medium rounded-3" style="color: #00796b;">
-                <i class="fa-solid fa-arrow-left me-1"></i> กลับคลังใหญ่
-            </a>
-            <a href="reports.php" class="btn btn-sm btn-outline-light rounded-3">
-                <i class="fa-solid fa-chart-pie me-1"></i> รายงาน
-            </a>
-        </div>
-    </div>
-</nav>
+<?php require __DIR__ . '/../includes/navigation.php'; ?>
 
 <div class="container-fluid py-4 px-lg-4">
 
